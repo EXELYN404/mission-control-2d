@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Data lokal (SQLite) — dibuat ulang saat runtime
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment & rahasia
+.env
+.env.*
+!.env.example
+
+# Node / build
+node_modules/
+.vercel/
+
+# Log & sistem
+*.log
+.DS_Store
+Thumbs.db
+
+# Cache editor
+.idea/
+.vscode/
+*.swp

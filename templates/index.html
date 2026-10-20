@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission Control 2D — EXELYN</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2214%22 font-size=%2214%22>🎯</text></svg>">
+</head>
+<body>
+
+<!-- ============================== -->
+<!-- TOP STATUS BAR -->
+<!-- ============================== -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-logo">◢◤</span>
+    <span class="brand-text">MISSION CONTROL 2D</span>
+    <span class="brand-sub">EXELYN · AI Team Dashboard</span>
+  </div>
+  <div class="topbar-status">
+    <div class="status-pill" id="server-status">
+      <span class="dot dot-green"></span>
+      <span>Lokal Aktif</span>
+    </div>
+    <div class="status-pill">
+      <span>🕒</span>
+      <span id="clock">--:--:--</span>
+    </div>
+    <div class="status-pill">
+      <span>📅</span>
+      <span id="date-text">--</span>
+    </div>
+  </div>
+</header>
+
+<div class="app-shell">
+
+  <!-- ============================== -->
+  <!-- SIDEBAR NAVIGATION -->
+  <!-- ============================== -->
+  <aside class="sidebar">
+    <nav class="nav">
+      <button class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">◉</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="agents">
+        <span class="nav-icon">◆</span>
+        <span class="nav-label">Agents</span>
+        <span class="nav-badge" id="badge-agents">--</span>
+      </button>
+      <button class="nav-item" data-page="calendar">
+        <span class="nav-icon">▦</span>
+        <span class="nav-label">Kalender</span>
+      </button>
+      <button class="nav-item" data-page="activity">
+        <span class="nav-icon">≡</span>
+        <span class="nav-label">Aktivitas</span>
+      </button>
+      <button class="nav-item" data-page="memory">
+        <span class="nav-icon">▣</span>
+        <span class="nav-label">Memory</span>
+      </button>
+      <button class="nav-item nav-item-special" data-page="office">
+        <span class="nav-icon">⬢</span>
+        <span class="nav-label">Visual 2D Office</span>
+        <span class="nav-badge" id="badge-office">--</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="legend">
+        <div class="legend-title">STATUS AGENT</div>
+        <div class="legend-item"><span class="dot dot-green"></span>Working</div>
+        <div class="legend-item"><span class="dot dot-yellow"></span>Idle</div>
+        <div class="legend-item"><span class="dot dot-cyan"></span>Reviewing</div>
+        <div class="legend-item"><span class="dot dot-purple"></span>Collaborating</div>
+        <div class="legend-item"><span class="dot dot-gray"></span>Offline</div>
+        <div class="legend-item"><span class="dot dot-orange"></span>Unknown</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============================== -->
+  <!-- MAIN CONTENT -->
+  <!-- ============================== -->
+  <main class="content">
+
+    <!-- DASHBOARD PAGE -->
+    <section class="page active" data-page="dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Ringkasan operasional tim AI kamu.</p>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Total Agents</div>
+          <div class="metric-value" id="m-agents">--</div>
+          <div class="metric-icon">◆</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Tasks Aktif</div>
+          <div class="metric-value" id="m-active">--</div>
+          <div class="metric-sub" id="m-progress">0% selesai</div>
+          <div class="metric-icon">▤</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Sedang Bekerja</div>
+          <div class="metric-value" id="m-working">--</div>
+          <div class="metric-sub">agents di Workspace</div>
+          <div class="metric-icon">▶</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Idle</div>
+          <div class="metric-value" id="m-idle">--</div>
+          <div class="metric-sub">menunggu di Lounge</div>
+          <div class="metric-icon">⏸</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Catatan Memory</div>
+          <div class="metric-value" id="m-memory">--</div>
+          <div class="metric-sub">entri pengetahuan</div>
+          <div class="metric-icon">▣</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Event Kalender</div>
+          <div class="metric-value" id="m-events">--</div>
+          <div class="metric-sub">terjadwal</div>
+          <div class="metric-icon">▦</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>Distribusi State Agents</h3>
+          </div>
+          <div class="state-bars" id="state-bars">
+            <div class="empty-mini">Memuat…</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Tasks Prioritas Tinggi</h3>
+          </div>
+          <div class="task-mini-list" id="upcoming-tasks">
+            <div class="empty-mini">Memuat…</div>
+          </div>
+        </div>
+
+        <div class="card card-wide">
+          <div class="card-header">
+            <h3>Aktivitas Terbaru</h3>
+            <span class="card-sub">Live feed</span>
+          </div>
+          <div class="activity-feed" id="recent-activities">
+            <div class="empty-mini">Memuat…</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AGENTS PAGE -->
+    <section class="page" data-page="agents">
+      <div class="page-header">
+        <h1>Agents</h1>
+        <p>Daftar anggota tim AI. Klik untuk melihat detail & mengubah state.</p>
+      </div>
+      <div class="agents-grid" id="agents-grid">
+        <div class="empty-mini">Memuat…</div>
+      </div>
+    </section>
+
+    <!-- TASKS PAGE -->
+    <!-- PAGE TASK BOARD DIHAPUS: pekerja tidak lagi membahas papan tugas.
+         Pekerjaan datang otomatis dari perubahan nyata (CLI, berkas, skill). -->
+
+    <!-- CALENDAR PAGE -->
+    <section class="page" data-page="calendar">
+      <div class="page-header">
+        <h1>Kalender</h1>
+        <p>Jadwal meeting, review, dan milestone tim.</p>
+      </div>
+      <div class="calendar-grid" id="calendar-list">
+        <div class="empty-mini">Memuat…</div>
+      </div>
+    </section>
+
+    <!-- ACTIVITY PAGE -->
+    <section class="page" data-page="activity">
+      <div class="page-header">
+        <h1>Aktivitas</h1>
+        <p>Log lengkap semua aktivitas tim.</p>
+      </div>
+      <div class="card">
+        <div class="activity-feed" id="all-activities">
+          <div class="empty-mini">Memuat…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEMORY PAGE -->
+    <section class="page" data-page="memory">
+      <div class="page-header">
+        <h1>Memory & Knowledge</h1>
+        <p>Catatan pengetahuan tim untuk referensi bersama.</p>
+        <button class="btn btn-primary" id="btn-new-memory">＋ Catatan Baru</button>
+      </div>
+      <div class="memory-grid" id="memory-grid">
+        <div class="empty-mini">Memuat…</div>
+      </div>
+    </section>
+
+    <!-- 2D OFFICE PAGE -->
+    <section class="page" data-page="office">
+      <div class="page-header">
+        <h1>Visual 2D Office</h1>
+        <p>Pixel-art workplace. Lihat di mana setiap agent berada & apa yang mereka kerjakan.</p>
+      </div>
+
+      <div class="office-layout">
+        <!-- Room navigator + canvas -->
+        <div class="office-main">
+          <div class="room-tabs" id="room-tabs">
+            <button class="room-tab active" data-room="workspace">🏢 Workspace</button>
+            <button class="room-tab" data-room="lounge">☕ Lounge</button>
+            <button class="room-tab" data-room="meeting">🗣 Meeting</button>
+            <button class="room-tab" data-room="pantry">🍽 Pantry</button>
+            <button class="room-tab" data-room="garden">🌳 Taman</button>
+            <button class="room-tab" data-room="all">🗺 Semua</button>
+          </div>
+
+          <div class="office-canvas-wrapper" id="office-canvas-wrapper">
+            <canvas id="office-canvas"></canvas>
+
+            <div class="camera-controls">
+              <button id="cam-zoom-in" title="Perbesar (tombol +)">＋</button>
+              <button id="cam-zoom-out" title="Perkecil (tombol -)">－</button>
+              <button id="cam-reset" title="Reset kamera (tombol 0)">⤢</button>
+              <button id="cam-follow" title="Kamera mengikuti agent terpilih">🎯</button>
+            </div>
+
+            <div class="sim-badge">● AGENT HIDUP — pekerjaan &amp; pikiran dihasilkan model AI dari data nyata (CLI, berkas, skill)</div>
+
+            <div class="cam-hint">
+              Drag untuk menggeser • Scroll untuk zoom • Klik agent untuk detail
+            </div>
+
+            <div class="canvas-overlay" id="canvas-overlay">
+              <div class="overlay-empty">Memuat ruangan…</div>
+            </div>
+          </div>
+
+          <div class="room-info">
+            <div class="room-info-title" id="room-name">Workspace</div>
+            <div class="room-info-desc" id="room-desc">Area kerja utama.</div>
+          </div>
+        </div>
+
+        <!-- Side panel -->
+        <aside class="office-side">
+          <div class="card">
+            <div class="card-header"><h3>Crew Summary</h3></div>
+            <div class="crew-summary" id="crew-summary">
+              <div class="empty-mini">Memuat…</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Live Activity</h3><span class="card-sub">● Live</span></div>
+            <div class="activity-feed activity-feed-compact" id="office-activity">
+              <div class="empty-mini">Memuat…</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Connected Channels</h3></div>
+            <div class="channel-list" id="channel-list">
+              <div class="empty-mini">Memuat…</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Agent info modal -->
+      <div class="modal" id="agent-modal" hidden>
+        <div class="modal-content">
+          <button class="modal-close" id="modal-close">✕</button>
+          <div class="modal-header">
+            <div class="agent-avatar-lg" id="modal-avatar">?</div>
+            <div>
+              <h2 id="modal-name">--</h2>
+              <p id="modal-role">--</p>
+            </div>
+          </div>
+          <div class="modal-body">
+            <div class="modal-row">
+              <span class="modal-label">State</span>
+              <span id="modal-state">--</span>
+            </div>
+            <div class="modal-row">
+              <span class="modal-label">Room</span>
+              <span id="modal-room">--</span>
+            </div>
+            <div class="modal-row">
+              <span class="modal-label">Tugas Saat Ini</span>
+              <span id="modal-task">--</span>
+            </div>
+            <div class="modal-row">
+              <span class="modal-label">Tentang</span>
+              <span id="modal-desc">--</span>
+            </div>
+
+            <div class="modal-section">
+              <h4>Ubah State</h4>
+              <div class="state-buttons" id="state-buttons">
+                <button class="state-btn" data-state="working">▶ Working</button>
+                <button class="state-btn" data-state="idle">⏸ Idle</button>
+                <button class="state-btn" data-state="reviewing">🔍 Reviewing</button>
+                <button class="state-btn" data-state="collaborating">🤝 Collaborating</button>
+                <button class="state-btn" data-state="offline">○ Offline</button>
+              </div>
+            </div>
+
+            <div class="modal-section">
+              <h4>Aktivitas Terbaru</h4>
+              <div class="activity-feed activity-feed-compact" id="modal-activities"></div>
+            </div>
+
+            <div class="modal-section">
+              <h4>Tugas Agent Ini</h4>
+              <div id="modal-tasks" class="task-mini-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================== -->
+<!-- MODAL: NEW TASK -->
+<!-- ============================== -->
+<div class="modal" id="task-modal" hidden>
+  <div class="modal-content modal-sm">
+    <button class="modal-close" data-close="task-modal">✕</button>
+    <h2>Task Baru</h2>
+    <form id="task-form" class="form">
+      <label>
+        <span>Judul</span>
+        <input type="text" name="title" required maxlength="120" placeholder="Misal: Buat laporan mingguan">
+      </label>
+      <label>
+        <span>Deskripsi</span>
+        <textarea name="description" rows="3" placeholder="Detail task…"></textarea>
+      </label>
+      <div class="form-row">
+        <label>
+          <span>Status</span>
+          <select name="status">
+            <option value="todo">To Do</option>
+            <option value="in_progress">In Progress</option>
+            <option value="review">Review</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <label>
+          <span>Prioritas</span>
+          <select name="priority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        <span>Assignee</span>
+        <select name="assignee_id" id="task-assignee"></select>
+      </label>
+      <div class="form-actions">
+        <button type="button" class="btn" data-close="task-modal">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- MODAL: NEW MEMORY -->
+<!-- ============================== -->
+<div class="modal" id="memory-modal" hidden>
+  <div class="modal-content modal-sm">
+    <button class="modal-close" data-close="memory-modal">✕</button>
+    <h2>Catatan Memory Baru</h2>
+    <form id="memory-form" class="form">
+      <label>
+        <span>Judul</span>
+        <input type="text" name="title" required maxlength="120" placeholder="Misal: Konvensi penamaan">
+      </label>
+      <label>
+        <span>Isi Catatan</span>
+        <textarea name="content" rows="5" required placeholder="Tulis catatan…"></textarea>
+      </label>
+      <div class="form-row">
+        <label>
+          <span>Kategori</span>
+          <select name="category">
+            <option value="general">Umum</option>
+            <option value="engineering">Engineering</option>
+            <option value="design">Desain</option>
+            <option value="planning">Planning</option>
+            <option value="policy">Kebijakan</option>
+          </select>
+        </label>
+        <label>
+          <span>Tags (opsional)</span>
+          <input type="text" name="tags" placeholder="misal: api,frontend">
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn" data-close="memory-modal">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="/static/js/api.js"></script>
+<script src="/static/js/office.js"></script>
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>
