@@ -101,6 +101,7 @@ def init_db():
             desk_x INTEGER DEFAULT 0,
             desk_y INTEGER DEFAULT 0,
             description TEXT,
+            specialty TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -201,6 +202,11 @@ def init_db():
         if _col not in _mind_cols:
             cur.execute(f"ALTER TABLE agent_mind ADD COLUMN {_col} {_typ}")
 
+    # Migrasi: tambah kolom specialty ke tabel agents bila belum ada (database lama).
+    _agent_cols = {r["name"] for r in cur.execute("PRAGMA table_info(agents)")}
+    if "specialty" not in _agent_cols:
+        cur.execute("ALTER TABLE agents ADD COLUMN specialty TEXT")
+
     # Migrasi peran: Vera menjadi Microsoft 365 Specialist. Tim tetap enam
     # orang — tidak ada karakter ketujuh — tetapi satu peran berubah jadi
     # spesialis dokumen (Word/Excel/PowerPoint/PDF + OneDrive).
@@ -212,6 +218,13 @@ def init_db():
             updated_at = ?
         WHERE id = 'agent-reviewer'
     """, (datetime.now().isoformat(),))
+
+    # Pastikan semua agen punya specialty (migrasi aditif).
+    try:
+        import cli_bridge
+        cli_bridge.ensure_agent_specialties(conn)
+    except Exception:
+        pass
 
     # Seed data awal (hanya jika database kosong)
     cur.execute("SELECT COUNT(*) AS c FROM agents")
