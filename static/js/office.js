@@ -26,31 +26,31 @@ const OfficeRenderer = (() => {
     workspace: {
       id: "workspace", name: "Workspace", icon: "🏢",
       x: 40, y: 70, w: 880, h: 690, wallH: 250,
-      floor: "#2a3550", wall: "#182136", line: "#232d45",
+      floor: "#c8b89a", wall: "#e8e0d0", line: "#b8a88a",
       desc: "Area kerja utama. Agent yang bekerja duduk di meja masing-masing.",
     },
     lounge: {
       id: "lounge", name: "Lounge", icon: "☕",
       x: 980, y: 70, w: 880, h: 690, wallH: 250,
-      floor: "#2f2a45", wall: "#1d1a30", line: "#282445",
+      floor: "#a89070", wall: "#d8d0c0", line: "#988060",
       desc: "Area istirahat: sofa, TV, dan meja kopi.",
     },
     meeting: {
       id: "meeting", name: "Ruang Meeting", icon: "🗣",
       x: 40, y: 830, w: 600, h: 670, wallH: 170,
-      floor: "#2b3348", wall: "#1a2133", line: "#242c40",
+      floor: "#b8a890", wall: "#ddd5c5", line: "#a89880",
       desc: "Ruang diskusi: meja panjang, kursi, dan papan tulis.",
     },
     pantry: {
       id: "pantry", name: "Pantry", icon: "🍽",
       x: 700, y: 830, w: 600, h: 670, wallH: 170,
-      floor: "#33304a", wall: "#1f1c31", line: "#2a2740",
+      floor: "#d0c8b8", wall: "#e0d8c8", line: "#c0b8a8",
       desc: "Dapur kecil: mesin kopi, camilan, dan meja tinggi.",
     },
     garden: {
       id: "garden", name: "Taman", icon: "🌳",
       x: 1360, y: 830, w: 500, h: 670, wallH: 170,
-      floor: "#25402f", wall: "#16261c", line: "#2e4d39",
+      floor: "#7a9a6a", wall: "#c8d8b8", line: "#6a8a5a",
       desc: "Taman dalam ruangan: bangku, pohon, dan air mancur.",
     },
   };
