@@ -1291,9 +1291,16 @@ class ThreadedServer(ThreadingHTTPServer):
 # ====================================================================
 def main():
     import argparse
+    # Host/port bisa dari environment variable — diperlukan oleh platform
+    # hosting (Railway/Vercel menyet PORT sendiri).
+    env_port = os.environ.get("PORT")
+    env_host = os.environ.get("HOST")
     parser = argparse.ArgumentParser(description="Mission Control 2D - Local Server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host (default 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=3000, help="Port (default 3000)")
+    parser.add_argument("--host", default=env_host or "127.0.0.1",
+                        help="Host (default: env HOST atau 127.0.0.1)")
+    parser.add_argument("--port", type=int,
+                        default=int(env_port) if env_port else 3000,
+                        help="Port (default: env PORT atau 3000)")
     args = parser.parse_args()
 
     init_db()

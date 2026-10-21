@@ -1,0 +1,2 @@
+# Mission Control 2D — backend memakai Python standard library saja
+# (zero external dependencies), jadi requirements.txt sengaja dibiarkan kosong.

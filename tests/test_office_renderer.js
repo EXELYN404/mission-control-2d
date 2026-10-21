@@ -474,6 +474,15 @@ check("Agent bergerak menuju workspace",
 
 check("Simulasi panjang tanpa error", true, "loop berjalan > 9 menit simulasi");
 
+// Pulihkan agent yang tadi dipromosikan ke kondisi semula. Tanpa ini hanya
+// tersisa SATU agent idle, sehingga tidak pernah ada pasangan untuk
+// percakapan santai dan pengujian gelembung/emosi di bagian 13-16 gagal.
+OfficeRenderer.setData({
+  agents: agents.map((a) =>
+    a.id === targetId ? { ...a, state: "idle", current_task: null } : a),
+  tasks, task_summary: taskSummary, rooms: [], recent_activities: [],
+});
+
 // ============ 8. DIALOG DIGERAKKAN MODEL AI ============
 fetchMode = "ai";
 let aiChat = null;

@@ -3,7 +3,11 @@
  * Wrapper untuk semua endpoint REST API backend.
  */
 const API = (() => {
-  const BASE = "/api";
+  // Base URL: secara default RELATIVE (/api) supaya jalan lokal maupun saat
+  // frontend dan backend satu domain. Saat frontend di-deploy terpisah
+  // (mis. Vercel) dengan backend di platform lain (mis. Railway), set
+  // window.__API_BASE__ ke URL backend, atau pakai rewrite di vercel.json.
+  const BASE = (typeof window !== "undefined" && window.__API_BASE__) || "/api";
 
   async function request(path, options = {}) {
     const url = BASE + path;

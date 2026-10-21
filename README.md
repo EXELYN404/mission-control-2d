@@ -179,6 +179,58 @@ Yang diuji antara lain:
 
 ---
 
+## Deploy (GitHub + Vercel + Railway)
+
+Repo ini siap dipublish. Backend memakai **Python standard library saja**
+(zero dependencies), jadi tidak butuh `pip install`.
+
+### 1. GitHub
+```bash
+cd mission-control-2d
+git init
+git add -A
+git commit -m "Mission Control 2D"
+git remote add origin https://github.com/<user>/<repo>.git
+git push -u origin main
+```
+
+### 2. Backend → Railway
+Backend (`server.py`) adalah HTTP server stdlib Python yang menyajikan
+`/api/*` dan database SQLite. Railway menjalankannya lewat `Procfile`:
+
+```
+web: python3 server.py --host 0.0.0.0 --port $PORT
+```
+
+Langkah:
+1. Buat project baru di Railway → **Deploy from GitHub repo** ini.
+2. Railway otomatis memakai `railway.json` (builder Nixpacks, port dari `$PORT`).
+3. Setelah aktif, salin **URL domain** Railway (mis. `https://xxx.up.railway.app`).
+
+> Catatan: database SQLite di Railway bersifat **ephemeral** — file
+> `data/mission.db` bisa hilang saat container restart. Untuk data persisten,
+> gunakan volume Railway atau ganti ke PostgreSQL.
+
+### 3. Frontend → Vercel
+Frontend (HTML + JS di `static/` dan `templates/`) di-deploy ke Vercel sebagai
+static site. `vercel.json` sudah mengatur:
+- `/` → `templates/index.html`
+- `/api/*` → dialihkan ke URL backend Railway
+
+Langkah:
+1. Buat project baru di Vercel → **Import Git Repository** ini.
+2. Set environment variable `BACKEND_URL` = URL Railway (langkah 2).
+3. Deploy. Frontend akan memanggil API di backend Railway.
+
+### Lingkungan lokal
+```bash
+python3 server.py --host 0.0.0.0 --port 3000
+# buka http://localhost:3000
+```
+Host/port juga bisa dari environment variable `HOST` dan `PORT`.
+
+---
+
 ## Reset Data Demo
 
 Hapus database — server akan membuat ulang data demo saat dijalankan:
