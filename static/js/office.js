@@ -2242,6 +2242,43 @@ const OfficeRenderer = (() => {
     ctx.fillStyle = ao;
     ctx.fillRect(room.x, top, room.w, 90);
 
+    // Cahaya jendela — sinar diagonal dramatis dari setiap jendela ke lantai.
+    if (room.wallH >= 220) {
+      const n = Math.max(2, Math.floor(room.w / 290));
+      for (let i = 0; i < n; i++) {
+        const wx = room.x + 70 + i * ((room.w - 140) / n) + 75;
+        const wy = room.y + 105;
+        // Kerucut cahaya ke bawah
+        const beam = ctx.createLinearGradient(wx, wy, wx, top + 200);
+        beam.addColorStop(0, "rgba(255,248,220,0.18)");
+        beam.addColorStop(0.4, "rgba(255,248,220,0.08)");
+        beam.addColorStop(1, "rgba(255,248,220,0)");
+        ctx.fillStyle = beam;
+        ctx.beginPath();
+        ctx.moveTo(wx - 60, wy);
+        ctx.lineTo(wx + 60, wy);
+        ctx.lineTo(wx + 140, top + 200);
+        ctx.lineTo(wx - 140, top + 200);
+        ctx.closePath();
+        ctx.fill();
+        // Kilau pada lantai di bawah jendela
+        const glow = ctx.createRadialGradient(wx, top + 80, 0, wx, top + 80, 120);
+        glow.addColorStop(0, "rgba(255,248,220,0.12)");
+        glow.addColorStop(1, "rgba(255,248,220,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(wx - 120, top, 240, 160);
+      }
+    }
+
+    // Vignette — tepi ruangan lebih gelap (dramatis).
+    const vig = ctx.createRadialGradient(
+      room.x + room.w / 2, top + (room.h - room.wallH) / 2, room.w * 0.3,
+      room.x + room.w / 2, top + (room.h - room.wallH) / 2, room.w * 0.7);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(room.x, top, room.w, room.h - room.wallH);
+
     // Skirting board (papan lis) di dasar dinding — kesan arsitektur nyata.
     ctx.fillStyle = shade(room.wall, 1.35);
     ctx.fillRect(room.x, top - 7, room.w, 7);
