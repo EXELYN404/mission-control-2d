@@ -44,7 +44,7 @@ Hentikan server dengan `CTRL+C` (atau `kill` PID-nya).
 | Halaman | Isi |
 |---|---|
 | **Dashboard** | Metrik ringkas, distribusi state agent, task prioritas, aktivitas terbaru |
-| **Agents** | Kartu semua agent + modal detail (state, room, tugas, riwayat) |
+| **Agents** | Kartu semua agent + modal detail (state, room, tugas, riwayat, **hasil AI**) |
 | **Task Board** | Kanban 4 kolom: To Do · In Progress · Review · Done |
 | **Kalender** | Event tim (meeting, review, milestone) |
 | **Aktivitas** | Log lengkap seluruh aktivitas tim |
@@ -90,6 +90,27 @@ Hentikan server dengan `CTRL+C` (atau `kill` PID-nya).
   komputernya** dan menghadap layar lagi
 - Mata berkedip, badan bernapas, kaki melangkah, asap kopi mengepul
 
+### Hasil AI per Agent
+Setiap agent menjalankan **otak AI** sendiri di latar belakang: model AI
+membaca data nyata terbaru (pekerjaan terbuka, perubahan terakhir, keadaan
+rekan satu kantor) lalu memutuskan apa yang dilakukan, apa yang dipikirkan,
+dan apa yang dirasakan agent itu. Hasilnya disimpan di tabel `agent_mind`.
+
+Halaman **Agents** menampilkannya langsung:
+
+| Kolom | Asal |
+|---|---|
+| Mood & emosi agent | Model AI |
+| "Sedang Memikirkan" | Model AI |
+| Aktivitas (AI) | Model AI |
+| Aksi & alasan | Model AI |
+| Model AI yang memutuskan | Model AI |
+| Ingatan terakhir agent | Model AI |
+
+Modal detail agent menampilkan semuanya sekaligus, plus model AI yang
+dipakai dan kapan keputusan terakhir diambil. Agent yang belum pernah
+mengambil keputusan ditandai `Belum ada data AI` — bukan data karangan.
+
 ---
 
 ## Integritas Data
@@ -103,6 +124,8 @@ Ini penting dan disengaja:
 | Judul tugas di atas kepala | Tabel `tasks` (di-join) | **NYATA** |
 | Topik obrolan Workspace (judul task, status, assignee, progres) | Tabel `tasks` | **NYATA** |
 | Activity feed, kalender, memory, channel | Database backend | **NYATA** |
+| Mood, emosi, pikiran, aktivitas, alasan tiap agent | Otak AI (`agent_mind`) | **NYATA** |
+| Model AI yang memutuskan tiap agent | Otak AI (`agent_mind`) | **NYATA** |
 | Posisi, gerakan, giliran bicara, dan kalimat obrolan | Simulasi di klien | **SIMULASI** |
 | Topik obrolan Lounge (santai) | Daftar kalimat di klien | **SIMULASI** |
 
@@ -142,8 +165,8 @@ mission-control-2d/
 | Method | Endpoint | Keterangan |
 |---|---|---|
 | GET | `/api/dashboard` | Ringkasan metrik |
-| GET | `/api/agents` | Daftar agent |
-| GET | `/api/agents/{id}` | Detail agent + aktivitas + task |
+| GET | `/api/agents` | Daftar agent (termasuk `mind`: hasil AI) |
+| GET | `/api/agents/{id}` | Detail agent + aktivitas + task + `mind` (hasil AI) |
 | POST | `/api/agents/{id}/state` | Ubah state agent `{state, room}` |
 | GET | `/api/tasks` | Daftar task (`?status=`) |
 | POST | `/api/tasks` | Buat task |

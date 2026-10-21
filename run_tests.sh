@@ -47,6 +47,22 @@ if curl -s -o /dev/null --max-time 3 "$BASE/api/dashboard"; then
   done
   CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/")
   if [ "$CODE" = "200" ]; then echo "      OK  / (halaman utama)"; else echo "      GAGAL  / (HTTP $CODE)"; FAIL=1; fi
+
+  # Hasil AI harus ikut disajikan di data agent
+  MIND=$(curl -s "$BASE/api/agents" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin).get('data') or []
+except Exception:
+    d = []
+print('yes' if d and all('mind' in a for a in d) else 'no')
+" 2>/dev/null)
+  if [ "$MIND" = "yes" ]; then
+    echo "      OK  /api/agents menyertakan hasil AI (mind)"
+  else
+    echo "      GAGAL  /api/agents tidak menyertakan hasil AI"
+    FAIL=1
+  fi
 else
   echo "      Server belum jalan. Jalankan: ./start.sh"
   echo "      (dilewati)"

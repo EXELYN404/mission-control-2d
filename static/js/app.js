@@ -234,6 +234,97 @@ async function loadDashboard() {
 }
 
 // ==========================================
+// HASIL AI AGENT
+// ==========================================
+// Keputusan AI (mood, emosi, pikiran, aktivitas, model) disimpan backend di
+// tabel agent_mind dan dilampirkan ke tiap agent sebagai `mind`. Tanpa
+// penampilan ini, hasil AI tidak terlihat sama sekali di UI.
+
+function aiHasData(m) {
+  return !!(
+    m &&
+    ((m.thought || "").toString().trim() ||
+      (m.activity || "").toString().trim() ||
+      (m.mood || "").toString().trim())
+  );
+}
+
+function aiSourceLabel(m) {
+  if (!m || !m.source) return "";
+  return m.source === "ai" ? "AI" : String(m.source);
+}
+
+/** Blok hasil AI untuk kartu agent di halaman Agents. */
+function aiCardBlock(a) {
+  const m = a.mind;
+  if (!aiHasData(m)) {
+    return `
+      <div class="agent-ai agent-ai-empty">
+        <span class="ai-dot"></span>
+        <span>Belum ada data AI</span>
+      </div>`;
+  }
+  const mood = (m.mood || "").toString().trim();
+  const thought = (m.thought || "").toString().trim();
+  const activity = (m.activity || "").toString().trim();
+  const src = aiSourceLabel(m);
+  return `
+    <div class="agent-ai">
+      <div class="agent-ai-head">
+        ${mood ? `<span class="ai-mood">${esc(mood)}</span>` : ""}
+        ${src ? `<span class="ai-src">${esc(src)}</span>` : ""}
+      </div>
+      ${thought ? `<div class="agent-ai-thought">${esc(thought)}</div>` : ""}
+      ${activity ? `<div class="agent-ai-act">${esc(activity)}</div>` : ""}
+    </div>`;
+}
+
+/** Panel hasil AI untuk modal detail agent. */
+function renderAgentAi(m) {
+  const box = $("#modal-ai");
+  if (!box) return;
+
+  if (!aiHasData(m)) {
+    box.innerHTML = `
+      <div class="empty-mini">
+        Belum ada hasil AI untuk agent ini.<br>
+        <span class="hint">Data muncul setelah agent mengambil keputusan
+        (otak AI berjalan otomatis di latar belakang).</span>
+      </div>`;
+    return;
+  }
+
+  const rows = [
+    ["Mood", (m.mood || "").toString().trim()],
+    ["Emosi", (m.emotion || "").toString().trim()],
+    ["Sedang Memikirkan", (m.thought || "").toString().trim()],
+    ["Aktivitas (AI)", (m.activity || "").toString().trim()],
+    ["Aksi", (m.action || "").toString().trim()],
+    ["Alasan", (m.reason || "").toString().trim()],
+    ["Model AI", (m.model || "").toString().trim()],
+    ["Sumber", aiSourceLabel(m)],
+  ].filter(([, v]) => v);
+
+  const memory = ((m.memory || "").toString().split("\u2028").filter(Boolean)).slice(-5);
+
+  box.innerHTML = `
+    <div class="ai-grid">
+      ${rows.map(([k, v]) => `
+        <div class="ai-row">
+          <span class="ai-key">${esc(k)}</span>
+          <span class="ai-val">${esc(v)}</span>
+        </div>`).join("")}
+    </div>
+    ${m.updated_at ? `<div class="ai-updated">Diperbarui ${esc(m.updated_at)}</div>` : ""}
+    ${memory.length ? `
+      <div class="ai-memory">
+        <div class="ai-memory-title">Ingatan terakhir</div>
+        <ul>${memory.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      </div>` : ""}
+  `;
+}
+
+// ==========================================
 // AGENTS
 // ==========================================
 async function loadAgents() {
@@ -271,6 +362,7 @@ async function loadAgents() {
                 ${esc(a.current_task)}
               </div>
             ` : ""}
+            ${aiCardBlock(a)}
           </div>`;
       })
       .join("");
@@ -319,6 +411,9 @@ async function openAgentModal(agentId) {
     $("#modal-room").textContent = agent.current_room || "unknown";
     $("#modal-task").textContent = agent.current_task || "Tidak ada tugas";
     $("#modal-desc").textContent = agent.description || "-";
+
+    // Hasil AI agent (mood, emosi, pikiran, aktivitas, model)
+    renderAgentAi(data.mind);
 
     // State buttons
     $$("#state-buttons .state-btn").forEach((btn) => {
@@ -915,6 +1010,8 @@ async function init() {
       loadOffice();
     } else if (state.currentPage === "dashboard") {
       loadDashboard();
+    } else if (state.currentPage === "agents") {
+      loadAgents();
     }
   }, 30000);
 

@@ -179,13 +179,27 @@ def init_db():
         CREATE TABLE IF NOT EXISTS agent_mind (
             agent_id TEXT PRIMARY KEY,
             mood TEXT,
+            emotion TEXT,
             thought TEXT,
             action TEXT,
+            target TEXT,
             reason TEXT,
+            activity TEXT,
             memory TEXT,
+            source TEXT,
+            model TEXT,
+            latency REAL,
             updated_at TEXT
         )
     """)
+
+    # Migrasi: database lama dibuat sebelum kolom hasil AI lengkap ada.
+    # Tanpa ini, INSERT dengan kolom baru gagal "no column named emotion".
+    _mind_cols = {r["name"] for r in cur.execute("PRAGMA table_info(agent_mind)")}
+    for _col, _typ in (("emotion", "TEXT"), ("target", "TEXT"), ("activity", "TEXT"),
+                       ("source", "TEXT"), ("model", "TEXT"), ("latency", "REAL")):
+        if _col not in _mind_cols:
+            cur.execute(f"ALTER TABLE agent_mind ADD COLUMN {_col} {_typ}")
 
     # Seed data awal (hanya jika database kosong)
     cur.execute("SELECT COUNT(*) AS c FROM agents")
@@ -439,12 +453,41 @@ def api_dashboard(handler):
     })
 
 
+def attach_mind(agents, cur=None):
+    """Lampirkan hasil AI (tabel `agent_mind`) ke daftar agent.
+
+    Keputusan AI — mood, emosi, pikiran, aktivitas, alasan, serta model yang
+    memutuskan — disimpan terpisah di `agent_mind`. Tanpa pelampiran ini UI
+    tidak punya akses ke apa yang sedang dipikirkan/dirasakan agent, sehingga
+    "hasil AI" tampak tidak ada sama sekali.
+
+    `cur` boleh dilewatkan bila pemanggil sudah memegang koneksi sendiri
+    (lebih hemat satu koneksi per request).
+    """
+    own = cur is None
+    conn = None
+    if own:
+        conn = get_db()
+        cur = conn.cursor()
+    try:
+        for a in agents:
+            row = cur.execute(
+                "SELECT * FROM agent_mind WHERE agent_id = ?", (a.get("id"),)
+            ).fetchone()
+            a["mind"] = row_to_dict(row) if row else None
+    finally:
+        if own and conn is not None:
+            conn.close()
+    return agents
+
+
 def api_agents_list(handler):
     """List semua agents."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM agents ORDER BY name")
     agents = rows_to_list(cur.fetchall())
+    attach_mind(agents, cur)
     conn.close()
     json_response(handler, {"ok": True, "data": agents})
 
@@ -473,10 +516,12 @@ def api_agent_detail(handler, agent_id):
             updated_at DESC
     """, (agent_id,))
     tasks = rows_to_list(cur.fetchall())
+    attach_mind([agent], cur)
     conn.close()
     json_response(handler, {
         "ok": True,
-        "data": {"agent": agent, "activities": activities, "tasks": tasks}
+        "data": {"agent": agent, "mind": agent.get("mind"),
+                 "activities": activities, "tasks": tasks}
     })
 
 
@@ -729,6 +774,7 @@ def api_office_state(handler):
         ORDER BY name
     """)
     agents = rows_to_list(cur.fetchall())
+    attach_mind(agents, cur)
 
     # Lengkapi current_task dari tabel tasks (data nyata, bukan simulasi)
     for a in agents:
@@ -1004,14 +1050,20 @@ def api_office_brain(handler):
         def _save_mind(aid=aid, res=res, mem_lines=mem_lines):
             cur.execute("""
                 INSERT INTO agent_mind
-                    (agent_id, mood, thought, action, reason, memory, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (agent_id, mood, emotion, thought, action, target, reason,
+                     activity, memory, source, model, latency, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(agent_id) DO UPDATE SET
-                    mood = excluded.mood, thought = excluded.thought,
-                    action = excluded.action, reason = excluded.reason,
-                    memory = excluded.memory, updated_at = excluded.updated_at
-            """, (aid, res.get("mood"), res.get("thought"), res.get("action"),
-                  res.get("reason"), "\u2028".join(mem_lines),
+                    mood = excluded.mood, emotion = excluded.emotion,
+                    thought = excluded.thought, action = excluded.action,
+                    target = excluded.target, reason = excluded.reason,
+                    activity = excluded.activity, memory = excluded.memory,
+                    source = excluded.source, model = excluded.model,
+                    latency = excluded.latency, updated_at = excluded.updated_at
+            """, (aid, res.get("mood"), res.get("emotion") or res.get("mood"),
+                  res.get("thought"), res.get("action"), res.get("target"),
+                  res.get("reason"), res.get("activity"), "\u2028".join(mem_lines),
+                  res.get("source"), res.get("model"), res.get("latency"),
                   datetime.now().isoformat()))
             return True
         db_write(_save_mind)
