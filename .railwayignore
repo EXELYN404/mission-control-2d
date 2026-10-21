@@ -1,0 +1,24 @@
+# Jangan ikut di-upload ke Railway — database dibuat ulang saat runtime
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Vercel (frontend live di sana, bukan di Railway)
+.vercel/
+api/
+vercel.json
+
+# Git & editor
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+
+# Dokumentasi lokal
+README.md
