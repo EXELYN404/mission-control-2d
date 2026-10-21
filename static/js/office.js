@@ -3726,5 +3726,48 @@ const OfficeRenderer = (() => {
       })),
     }),
     getCurrentRoom: () => null,
+
+    /**
+     * Tampilkan gelembung di atas kepala satu agen (dipakai menu chat).
+     *
+     * Inilah jembatan antara chat dan kantor 2D: ketika pengguna memanggil
+     * nama agen, agen itu yang menjawab, dan jawabannya muncul sebagai
+     * gelembung seperti biasa. Mengembalikan true bila agen ditemukan dan
+     * gelembung terpasang, false bila id tidak dikenal.
+     */
+    say: (agentId, text, emotion, durationSec) => {
+      let target = null;
+      for (const sim of sims.values()) {
+        if (sim.id === agentId) { target = sim; break; }
+      }
+      if (!target) return false;
+      const clean = String(text == null ? "" : text).trim();
+      if (!clean) return false;
+      const emo = emotion || target.emotion || null;
+      // Durasi mengikuti panjang kalimat, seperti gelembung obrolan biasa.
+      const dur = Math.max(3.5, durationSec ||
+        Math.min(16, Math.max(3.5, clean.length / 14)));
+      target.bubble = {
+        kind: "chat",
+        text: clean,
+        speaker: target.agent ? target.agent.name : "",
+        emotion: emo,
+        ttl: dur,
+      };
+      if (emo) target.emotion = emo;
+      target.activity = "Menjawab pengguna";
+      return true;
+    },
+
+    /** Daftar id agen yang sedang hidup di kantor (untuk validasi chat). */
+    agentIds: () => [...sims.values()].map((s) => s.id),
+
+    /**Nama agen berdasarkan id, atau null. */
+    agentName: (agentId) => {
+      for (const sim of sims.values()) {
+        if (sim.id === agentId) return sim.agent ? sim.agent.name : "?";
+      }
+      return null;
+    },
   };
 })();

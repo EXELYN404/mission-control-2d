@@ -60,5 +60,42 @@ const API = (() => {
 
     // Office
     getOfficeState: () => request("/office"),
+
+    // Statistik mesin AI
+    getAiStats: () => request("/office/ai-stats"),
+
+    // ------------------------------------------------------------------
+    // CHAT — menu chat agen + CLI EXELYN AGENT AI
+    // ------------------------------------------------------------------
+    // getChatStatus mengembalikan kemampuan nyata (Hermes ada/tidak, model
+    // apa saja yang disediakan rantai AI), bukan janji kosong.
+    getChatStatus: () => request("/chat/status"),
+
+    /**
+     * Kirim pesan ke menu chat.
+     * Bila pesan menyebut nama agen, agen itu yang menjawab (mode "agent").
+     * Bila prefer_cli dipakai, seluruh kemampuan CLI dijalankan (mode "cli").
+     */
+    sendChat: (message, opts = {}) =>
+      request("/chat/send", {
+        method: "POST",
+        body: JSON.stringify({
+          message,
+          agent_id: opts.agentId || null,
+          prefer_cli: !!opts.preferCli,
+          workdir: opts.workdir || null,
+        }),
+      }),
+
+    // ------------------------------------------------------------------
+    // MICROSOFT 365 — dokumen nyata + OneDrive
+    // ------------------------------------------------------------------
+    getMs365Status: () => request("/ms365/status"),
+    getMs365Files: () => request("/ms365/files"),
+    createMs365Document: (spec, upload = true) =>
+      request("/ms365/create", {
+        method: "POST",
+        body: JSON.stringify({ spec, upload }),
+      }),
   };
 })();

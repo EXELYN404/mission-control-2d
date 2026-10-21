@@ -201,6 +201,18 @@ def init_db():
         if _col not in _mind_cols:
             cur.execute(f"ALTER TABLE agent_mind ADD COLUMN {_col} {_typ}")
 
+    # Migrasi peran: Vera menjadi Microsoft 365 Specialist. Tim tetap enam
+    # orang — tidak ada karakter ketujuh — tetapi satu peran berubah jadi
+    # spesialis dokumen (Word/Excel/PowerPoint/PDF + OneDrive).
+    cur.execute("""
+        UPDATE agents
+        SET role = 'Microsoft 365 Specialist',
+            specialty = 'ms365',
+            description = 'Menyiapkan dokumen Word, Excel, PowerPoint, dan PDF yang rapi, mengelola berkas, serta mengunggahnya ke OneDrive.',
+            updated_at = ?
+        WHERE id = 'agent-reviewer'
+    """, (datetime.now().isoformat(),))
+
     # Seed data awal (hanya jika database kosong)
     cur.execute("SELECT COUNT(*) AS c FROM agents")
     if cur.fetchone()["c"] == 0:
@@ -224,8 +236,10 @@ def seed_data(cur):
          "lounge", 0, 0, "Menulis API server dan database schema."),
         ("agent-researcher", "Sage", "Researcher", "#ec4899", "idle",
          "lounge", 0, 0, "Mengumpulkan informasi dan analisis."),
-        ("agent-reviewer", "Vera", "Reviewer", "#06b6d4", "reviewing",
-         "workspace", 530, 220, "Memeriksa kualitas kode dan output."),
+        ("agent-reviewer", "Vera", "Microsoft 365 Specialist", "#06b6d4", "working",
+         "workspace", 530, 220,
+         "Menyiapkan dokumen Word, Excel, PowerPoint, dan PDF yang rapi, "
+         "mengelola berkas, serta mengunggahnya ke OneDrive."),
     ]
     for a in agents:
         cur.execute("""
@@ -1076,6 +1090,106 @@ def api_office_brain(handler):
                             "data": {"decisions": decisions, "focus": focus}})
 
 
+def api_chat_status(handler):
+    """Kemampuan menu chat: mesin balasan agen + ketersediaan Hermes."""
+    import agents_chat
+    json_response(handler, {"ok": True, "data": agents_chat.status()})
+
+
+def api_chat_send(handler):
+    """
+    Terima pesan dari menu chat.
+
+    Bila pesan menyebut nama agen, agen itu menjawab dengan model AI nyata
+    dan hasilnya siap ditampilkan sebagai gelembung di kantor 2D.
+    Bila tidak ada nama agen dan pengguna memilih mode CLI, seluruh kemampuan
+    CLI EXELYN AGENT AI dijalankan lewat `hermes -z`.
+    """
+    import agents_chat
+    body = read_body(handler)
+    message = str(body.get("message") or "").strip()
+    if not message:
+        json_response(handler, {"ok": False, "error": "Pesan kosong."}, 400)
+        return
+    if len(message) > 4000:
+        json_response(handler, {"ok": False, "error": "Pesan terlalu panjang (maks 4000)."}, 400)
+        return
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, role, specialty, state, current_task, "
+                "current_room, description FROM agents ORDER BY name")
+    agents = rows_to_list(cur.fetchall())
+    conn.close()
+
+    try:
+        result = agents_chat.handle_message(
+            message, agents,
+            selected_agent_id=body.get("agent_id"),
+            workdir=body.get("workdir"),
+            prefer_cli=bool(body.get("prefer_cli")),
+        )
+    except agents_chat.ChatError as exc:
+        json_response(handler, {"ok": False, "error": str(exc), "code": exc.code,
+                                "hint": exc.hint}, 400)
+        return
+    except Exception as exc:                                    # pragma: no cover
+        json_response(handler, {"ok": False,
+                                "error": f"Kesalahan internal: {exc}"}, 500)
+        return
+
+    json_response(handler, {"ok": True, "data": result})
+
+
+def api_ms365_status(handler):
+    """Status kapabilitas Microsoft 365 Specialist."""
+    import ms365
+    try:
+        json_response(handler, {"ok": True, "data": ms365.status()})
+    except Exception as exc:
+        json_response(handler, {"ok": False, "error": str(exc)}, 500)
+
+
+def api_ms365_create(handler):
+    """
+    Buat dokumen nyata dari spesifikasi lalu (opsional) unggah ke OneDrive.
+
+    Tidak ada respons sukses tanpa berkas nyata yang terverifikasi.
+    """
+    import ms365
+    body = read_body(handler)
+    spec = body.get("spec") or body.get("document") or body
+    if not isinstance(spec, dict) or not spec:
+        json_response(handler, {"ok": False, "error": "Spec dokumen tidak valid."}, 400)
+        return
+
+    upload = body.get("upload", True)
+    if isinstance(upload, str):
+        upload = upload.lower() not in ("0", "false", "no")
+
+    try:
+        result = ms365.deliver(spec, upload=bool(upload))
+    except ms365.Ms365Error as exc:
+        json_response(handler, {"ok": False, "error": str(exc), "code": exc.code,
+                                "hint": exc.hint}, 400)
+        return
+    except Exception as exc:                                    # pragma: no cover
+        json_response(handler, {"ok": False,
+                                "error": f"Kesalahan internal: {exc}"}, 500)
+        return
+
+    json_response(handler, {"ok": True, "data": result})
+
+
+def api_ms365_files(handler):
+    """Daftar berkas nyata di folder OneDrive (bukti, bukan karangan)."""
+    import ms365
+    try:
+        json_response(handler, {"ok": True, "data": ms365.list_onedrive()})
+    except ms365.Ms365Error as exc:
+        json_response(handler, {"ok": False, "error": str(exc), "code": exc.code}, 400)
+
+
 def api_ai_stats(handler):
     """Statistik mesin dialog AI (untuk pemantauan)."""
     json_response(handler, {
@@ -1292,8 +1406,24 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                         api_office_brain(self)
                     else:
                         json_response(self, {"ok": False, "error": "Gunakan POST"}, 405)
+                elif path == "/api/chat/send":
+                    if method == "POST":
+                        api_chat_send(self)
+                    else:
+                        json_response(self, {"ok": False, "error": "Gunakan POST"}, 405)
+                elif path == "/api/ms365/create":
+                    if method == "POST":
+                        api_ms365_create(self)
+                    else:
+                        json_response(self, {"ok": False, "error": "Gunakan POST"}, 405)
                 elif path == "/api/office/ai-stats":
                     api_ai_stats(self)
+                elif path == "/api/chat/status":
+                    api_chat_status(self)
+                elif path == "/api/ms365/status":
+                    api_ms365_status(self)
+                elif path == "/api/ms365/files":
+                    api_ms365_files(self)
                 elif path == "/api/cli/status":
                     api_cli_status(self)
                 elif path == "/api/cli/sync":

@@ -379,6 +379,426 @@ async function loadAgents() {
   }
 }
 
+// ==========================================
+// CHAT — panel komunikasi mengambang (kiri bawah)
+// ==========================================
+// Gelembung yang belum bisa dipasang (kantor belum hidup) disimpan dulu.
+const pendingBubbles = [];
+
+const chatState = {
+  agents: [],
+  selectedAgentId: null,
+  mode: "agent",          // "agent" | "cli"
+  busy: false,
+  open: false,
+  history: [],
+};
+
+/** Muat daftar agen + status kemampuan nyata (Hermes, model, MS 365). */
+async function loadChat() {
+  try {
+    const [agents, status, ms] = await Promise.all([
+      API.getAgents().catch(() => []),
+      API.getChatStatus().catch(() => null),
+      API.getMs365Status().catch(() => null),
+    ]);
+    chatState.agents = agents;
+    window.__chatStatus = status;
+    renderChatConn(status);
+    renderAgentPop();
+    renderMs365Panel(ms);
+    flushPendingBubbles();
+  } catch (err) {
+    console.error("Chat error:", err);
+  }
+}
+
+/** Panel mengambang: buka / tutup dengan animasi pendek. */
+function openChat() {
+  const panel = $("#chat-panel");
+  const launcher = $("#chat-launcher");
+  if (!panel) return;
+  panel.hidden = false;
+  panel.classList.remove("closing");
+  panel.classList.add("opening");
+  panel.addEventListener("animationend", () => panel.classList.remove("opening"), { once: true });
+  launcher.setAttribute("aria-expanded", "true");
+  chatState.open = true;
+  loadChat();
+  const input = $("#chat-input");
+  if (input) input.focus();
+}
+
+function closeChat() {
+  const panel = $("#chat-panel");
+  const launcher = $("#chat-launcher");
+  if (!panel) return;
+  panel.classList.remove("opening");
+  panel.classList.add("closing");
+  const done = () => {
+    panel.hidden = true;
+    panel.classList.remove("closing");
+  };
+  panel.addEventListener("animationend", done, { once: true });
+  // Jaring pengaman bila event animasi tidak terpanggil.
+  setTimeout(() => {
+    if (!panel.classList.contains("closing")) return;
+    panel.hidden = true;
+    panel.classList.remove("closing");
+  }, 200);
+  launcher.setAttribute("aria-expanded", "false");
+  chatState.open = false;
+}
+
+/** Indikator koneksi mencerminkan kondisi backend yang sebenarnya. */
+function renderChatConn(status) {
+  const dot = $("#chat-conn-dot");
+  const txt = $("#chat-conn-text");
+  const badge = $("#chat-launcher-badge");
+  const cliBtn = $("#chat-mode-cli");
+  if (!dot || !txt) return;
+
+  const h = status && status.hermes;
+  const ok = !!(h && h.available);
+
+  dot.className = "conn-dot " + (ok ? "on" : "off");
+  txt.textContent = ok ? "TERHUBUNG" : "CLI TIDAK ADA";
+
+  if (badge) {
+    badge.textContent = ok ? "AI" : "—";
+    badge.classList.toggle("off", !ok);
+  }
+
+  // Mode CLI dinonaktifkan dengan alasan yang jelas bila Hermes tidak ada.
+  if (cliBtn) {
+    cliBtn.disabled = !ok;
+    cliBtn.title = ok ? "Jalankan CLI EXELYN AGENT AI"
+                      : "Hermes tidak terdeteksi di server ini";
+  }
+  if (!ok && chatState.mode === "cli") setChatMode("agent");
+}
+
+function setChatMode(mode) {
+  chatState.mode = mode;
+  const agentBtn = $("#chat-mode-agent");
+  const cliBtn = $("#chat-mode-cli");
+  if (agentBtn) {
+    agentBtn.classList.toggle("active", mode === "agent");
+    agentBtn.setAttribute("aria-selected", String(mode === "agent"));
+  }
+  if (cliBtn) {
+    cliBtn.classList.toggle("active", mode === "cli");
+    cliBtn.setAttribute("aria-selected", String(mode === "cli"));
+  }
+  const foot = $("#chat-foot");
+  if (foot) {
+    foot.textContent = mode === "cli"
+      ? "CLI penuh EXELYN AGENT AI — AI, skills, dan tools dijalankan sungguhan."
+      : "Sebut nama agen dan agen itu yang menjawab lewat gelembung di kantor.";
+  }
+}
+
+/** Popover pemilih agen: enam agen dengan avatar & bidang keahlian. */
+function renderAgentPop() {
+  const pop = $("#chat-agentpop");
+  const label = $("#chat-pick-label");
+  if (!pop) return;
+
+  pop.innerHTML = chatState.agents
+    .map(
+      (a) => `
+      <button class="chat-agentopt ${chatState.selectedAgentId === a.id ? "active" : ""}"
+              data-agent-id="${esc(a.id)}">
+        <span class="chat-agentopt-ava" style="background:${esc(a.avatar_color || "#3b82f6")}">
+          ${esc((a.name || "?").charAt(0))}
+        </span>
+        <span class="chat-agentopt-meta">
+          <span class="chat-agentopt-name">${esc(a.name)}</span>
+          <span class="chat-agentopt-role">${esc(a.role || "")}</span>
+        </span>
+        <span class="chat-agentopt-check">${chatState.selectedAgentId === a.id ? "●" : ""}</span>
+      </button>`
+    )
+    .join("");
+
+  $$("#chat-agentpop .chat-agentopt").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      chatState.selectedAgentId = btn.dataset.agentId;
+      renderAgentPop();
+      const a = chatState.agents.find((x) => x.id === chatState.selectedAgentId);
+      if (label && a) label.textContent = a.name.toUpperCase();
+      toggleAgentPop(false);
+      const input = $("#chat-input");
+      if (input) input.focus();
+    });
+  });
+}
+
+function toggleAgentPop(force) {
+  const pop = $("#chat-agentpop");
+  const pick = $("#chat-pick");
+  if (!pop) return;
+  const show = typeof force === "boolean" ? force : pop.hidden;
+  pop.hidden = !show;
+  if (pick) pick.setAttribute("aria-expanded", String(show));
+}
+
+function renderMs365Panel(ms) {
+  const box = $("#chat-ms365-body");
+  const state = $("#chat-ms365-state");
+  if (!box) return;
+
+  if (!ms) {
+    if (state) { state.textContent = "tidak terbaca"; state.style.color = "var(--c-idle)"; }
+    box.innerHTML = '<div class="empty-mini">Status Microsoft 365 tidak terbaca.</div>';
+    return;
+  }
+
+  const ok = ms.rclone === "TERSEDIA";
+  if (state) {
+    state.textContent = ok ? "OneDrive siap" : "OneDrive belum siap";
+    state.style.color = ok ? "var(--c-working)" : "var(--c-idle)";
+  }
+
+  const deps = Object.entries(ms.deps || {}).map(([k, v]) => `${k}: ${v}`).join(" · ");
+
+  box.innerHTML = `
+    <div class="chat-ms365-row"><span class="k">OneDrive</span><span class="v">${esc(ms.remote || "-")}</span></div>
+    <div class="chat-ms365-row"><span class="k">Folder</span><span class="v">${esc(ms.folder || "-")}</span></div>
+    <div class="chat-ms365-row"><span class="k">Pustaka</span><span class="v">${esc(deps)}</span></div>
+    <div class="chat-ms365-actions">
+      <button data-ms365="xlsx">Excel</button>
+      <button data-ms365="docx">Word</button>
+      <button data-ms365="pptx">PPT</button>
+      <button data-ms365="pdf">PDF</button>
+    </div>
+    <div class="chat-ms365-files" id="chat-ms365-files">
+      <div class="empty-mini">Memuat berkas OneDrive…</div>
+    </div>
+  `;
+
+  $$("#chat-ms365-body [data-ms365]").forEach((btn) => {
+    btn.addEventListener("click", () => makeSampleDoc(btn.dataset.ms365, btn));
+  });
+
+  loadMs365Files();
+}
+
+async function loadMs365Files() {
+  const box = $("#chat-ms365-files");
+  if (!box) return;
+  try {
+    const d = await API.getMs365Files();
+    const files = d.files || [];
+    box.innerHTML = files.length
+      ? files.map((f) => `<div>• ${esc(f)}</div>`).join("")
+      : '<div class="empty-mini">Belum ada berkas di OneDrive.</div>';
+  } catch (err) {
+    box.innerHTML = `<div class="empty-mini">OneDrive tidak dapat dibaca.</div>`;
+  }
+}
+
+async function makeSampleDoc(fmt, btn) {
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const r = await API.createMs365Document(sampleSpec(fmt), true);
+    addChatMessage("system", null,
+      `${r.document.filename} (${r.document.size} byte) dibuat` +
+      (r.uploaded ? ` · terunggah & terverifikasi` : ""));
+    loadMs365Files();
+  } catch (err) {
+    addChatMessage("system", null, `Gagal membuat dokumen: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+function sampleSpec(fmt) {
+  const title = "Laporan Agen Mission Control";
+  const headers = ["Agen", "Peran", "Status"];
+  const rows = chatState.agents.map((a) => [a.name, a.role, a.state]);
+  const base = { title, subtitle: "Dokumen contoh dari Microsoft 365 Specialist" };
+  if (fmt === "pptx") {
+    return { ...base, format: "pptx", slides: [
+      { title: "Tim Mission Control",
+        bullets: chatState.agents.map((a) => `${a.name} — ${a.role}`) },
+      { title: "Catatan",
+        bullets: ["Dokumen ini dihasilkan nyata oleh mesin MS 365."] },
+    ] };
+  }
+  if (fmt === "csv") return { ...base, format: "csv", table: { headers, rows } };
+  if (fmt === "pdf") {
+    return { ...base, format: "pdf",
+             paragraphs: [`Tim beranggotakan ${rows.length} agen yang sedang bertugas.`],
+             table: { headers, rows } };
+  }
+  if (fmt === "docx") {
+    return { ...base, format: "docx",
+             paragraphs: [`Berikut keadaan ${rows.length} agen saat ini.`],
+             table: { headers, rows } };
+  }
+  return { ...base, format: "xlsx", sheets: [{ name: "Agen", headers, rows }] };
+}
+
+function addChatMessage(kind, who, text, meta, pending) {
+  const box = $("#chat-conv");
+  if (!box) return null;
+  const empty = box.querySelector(".empty-mini");
+  if (empty) empty.remove();
+
+  const el = document.createElement("div");
+  el.className = `chat-msg ${kind}${pending ? " pending" : ""}`;
+  el.innerHTML =
+    (who ? `<span class="who">${esc(who)}</span>` : "") +
+    `<span class="txt">${esc(text)}</span>` +
+    (meta ? `<span class="meta">${esc(meta)}</span>` : "");
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  return el;
+}
+
+function addTyping() {
+  const el = addChatMessage("agent", null, "", null, true);
+  if (el) {
+    el.innerHTML = `<span class="chat-typing" aria-label="sedang mengetik"><i></i><i></i><i></i></span>`;
+  }
+  return el;
+}
+
+async function sendChatMessage() {
+  const input = $("#chat-input");
+  const btn = $("#chat-send");
+  if (!input || !btn || chatState.busy) return;
+
+  const message = input.value.trim();
+  if (!message) return;                      // jangan kirim pesan kosong
+
+  chatState.busy = true;
+  btn.disabled = true;
+  btn.classList.add("busy");
+  input.value = "";
+  autoGrow();
+
+  addChatMessage("user", "Anda", message, null, false);
+  const typing = addTyping();
+
+  try {
+    const data = await API.sendChat(message, {
+      agentId: chatState.selectedAgentId,
+      preferCli: chatState.mode === "cli",
+    });
+    chatState.history.push({ q: message, a: data });
+
+    if (typing) typing.remove();
+
+    if (data.mode === "agent") {
+      const meta = data.source === "ai"
+        ? `${data.model} · ${data.latency}s`
+        : (data.reply.error || "model tidak tersedia");
+      addChatMessage("agent", data.agent_name, data.reply.text, meta, false);
+      if (data.bubble && data.agent_id) {
+        showAgentBubble(data.agent_id, data.bubble, data.emotion);
+      }
+    } else {
+      addChatMessage("agent", "Hermes CLI", (data.reply.text || "").slice(0, 4000),
+        `CLI penuh · ${data.latency}s${data.workdir ? " · " + data.workdir : ""}`, false);
+    }
+  } catch (err) {
+    if (typing) typing.remove();
+    addChatMessage("system", null, err.message, null, false);
+  } finally {
+    chatState.busy = false;
+    if (btn) { btn.disabled = false; btn.classList.remove("busy"); }
+    if (input) input.focus();
+  }
+}
+
+/** Tinggi textarea mengikuti isi, tanpa melebihi batas. */
+function autoGrow() {
+  const input = $("#chat-input");
+  if (!input) return;
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 88) + "px";
+}
+
+/** Pasang gelembung di atas kepala agen — lewat API renderer kantor. */
+function showAgentBubble(agentId, text, emotion) {
+  const name = OfficeRenderer.agentName ? OfficeRenderer.agentName(agentId) : agentId;
+  const ok = !!(OfficeRenderer.say && OfficeRenderer.say(agentId, text, emotion));
+  if (!ok) pendingBubbles.push({ agentId, text, emotion });
+}
+
+function flushPendingBubbles() {
+  if (!pendingBubbles.length) return;
+  const rest = [];
+  for (const b of pendingBubbles) {
+    if (!(OfficeRenderer.say && OfficeRenderer.say(b.agentId, b.text, b.emotion))) rest.push(b);
+  }
+  pendingBubbles.length = 0;
+  pendingBubbles.push(...rest);
+}
+
+/** Dipanggil dari loadOffice() agar gelembung chat ikut muncul di kantor. */
+function onOfficeReady() {
+  flushPendingBubbles();
+}
+
+function initChat() {
+  const launcher = $("#chat-launcher");
+  const min = $("#chat-min");
+  const input = $("#chat-input");
+  const btn = $("#chat-send");
+  const pick = $("#chat-pick");
+  const agentBtn = $("#chat-mode-agent");
+  const cliBtn = $("#chat-mode-cli");
+
+  if (launcher) {
+    launcher.addEventListener("click", () => {
+      if (chatState.open) closeChat(); else openChat();
+    });
+  }
+  if (min) min.addEventListener("click", closeChat);
+
+  if (input) {
+    input.addEventListener("input", autoGrow);
+    input.addEventListener("keydown", (e) => {
+      // Enter mengirim, Shift+Enter membuat baris baru.
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+  if (btn) btn.addEventListener("click", sendChatMessage);
+
+  if (pick) {
+    pick.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleAgentPop();
+    });
+  }
+  if (agentBtn) {
+    agentBtn.addEventListener("click", () => setChatMode("agent"));
+  }
+  if (cliBtn) {
+    cliBtn.addEventListener("click", () => setChatMode("cli"));
+  }
+
+  // Tutup popover bila mengklik di luarnya.
+  document.addEventListener("click", (e) => {
+    const pop = $("#chat-agentpop");
+    if (pop && !pop.hidden && !pop.contains(e.target) && e.target !== pick) {
+      toggleAgentPop(false);
+    }
+  });
+
+  setChatMode("agent");
+}
+
 function stateColorName(state) {
   const map = {
     working: "green",
@@ -736,6 +1156,7 @@ async function loadOffice() {
     state.office = data;
 
     OfficeRenderer.setData(data);
+    if (typeof onOfficeReady === "function") onOfficeReady();
 
     // Terapkan ruangan hanya saat benar-benar berubah, supaya kamera tidak
     // "terbang" ulang setiap kali data di-refresh (tiap 30 detik).
@@ -950,6 +1371,8 @@ async function init() {
   initModals();
   initOffice();
   initMemoryForm();
+  initChat();
+  loadChat();          // panel mengambang: siapkan agen & status sejak awal
 
   // New task button
   const bnt = $("#btn-new-task");

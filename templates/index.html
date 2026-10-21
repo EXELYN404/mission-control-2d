@@ -70,15 +70,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="legend">
-        <div class="legend-title">STATUS AGENT</div>
-        <div class="legend-item"><span class="dot dot-green"></span>Working</div>
-        <div class="legend-item"><span class="dot dot-yellow"></span>Idle</div>
-        <div class="legend-item"><span class="dot dot-cyan"></span>Reviewing</div>
-        <div class="legend-item"><span class="dot dot-purple"></span>Collaborating</div>
-        <div class="legend-item"><span class="dot dot-gray"></span>Offline</div>
-        <div class="legend-item"><span class="dot dot-orange"></span>Unknown</div>
-      </div>
+      <div class="sidebar-clock" id="sidebar-clock">--:--</div>
     </div>
   </aside>
 
@@ -345,7 +337,62 @@
     </section>
 
   </main>
+
+  <!-- ============================== -->
+  <!-- CHAT — panel komunikasi mengambang (kiri bawah) -->
+  <!-- ============================== -->
+  <div class="chat-dock" id="chat-dock">
+    <button class="chat-launcher" id="chat-launcher" aria-label="Buka menu chat" aria-expanded="false">
+      <span class="chat-launcher-icon">💬</span>
+      <span class="chat-launcher-badge" id="chat-launcher-badge">AI</span>
+    </button>
+
+    <div class="chat-panel" id="chat-panel" hidden>
+      <div class="chat-panel-head">
+        <span class="chat-panel-title">COMMS</span>
+        <span class="chat-conn" id="chat-conn">
+          <span class="conn-dot" id="chat-conn-dot"></span>
+          <span id="chat-conn-text">…</span>
+        </span>
+        <button class="chat-min" id="chat-min" aria-label="Minimalkan chat">—</button>
+      </div>
+
+      <div class="chat-mode" role="tablist" aria-label="Mode chat">
+        <button class="chat-mode-btn cli" id="chat-mode-cli" role="tab"
+                aria-selected="false">CLI · EXELYN AGENT</button>
+        <button class="chat-mode-btn agent active" id="chat-mode-agent" role="tab"
+                aria-selected="true">AGENT</button>
+      </div>
+
+      <div class="chat-conv" id="chat-conv" aria-live="polite"></div>
+
+      <div class="chat-ms365bar">
+        <div class="chat-ms365bar-head">
+          <span class="chat-ms365bar-title">M365</span>
+          <span class="chat-ms365bar-state" id="chat-ms365-state">…</span>
+        </div>
+        <div class="chat-ms365-body" id="chat-ms365-body"></div>
+      </div>
+
+      <div class="chat-inputrow">
+        <button class="chat-pick" id="chat-pick" aria-haspopup="true" aria-expanded="false">
+          <span id="chat-pick-label">PILIH AGENT</span><span class="chat-pick-caret">▾</span>
+        </button>
+        <div class="chat-inputwrap">
+          <textarea id="chat-input" rows="1"
+                    placeholder="Ketik pesan atau instruksi..." maxlength="4000"></textarea>
+          <button class="chat-send" id="chat-send" aria-label="Kirim pesan">
+            <span class="chat-send-icon">➤</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-agentpop" id="chat-agentpop" hidden></div>
+      <div class="chat-foot" id="chat-foot">Sebut nama agen dan agen itu yang menjawab.</div>
+    </div>
+  </div>
 </div>
+
 
 <!-- ============================== -->
 <!-- MODAL: NEW TASK -->

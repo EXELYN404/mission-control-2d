@@ -265,6 +265,10 @@ PERSONAS = {
               "tidak cepat puas sebelum yakin tidak ada yang terlewat",
     "ops": "rapi dan waspada; selalu memikirkan stabilitas, proses, dan hal "
            "kecil yang bisa membuat sistem tumbang",
+    # Microsoft 365 Specialist — rapi, terstruktur, dan berorientasi hasil nyata
+    "ms365": "rapi dan berpikir terstruktur; senang menyusun laporan dan data "
+             "agar mudah dibaca; berbicara jelas dan menyebut hasil konkret; "
+             "memperhatikan format, judul, dan kerapian dokumen",
 }
 DEFAULT_PERSONA = "ramah, santai, dan suka menolong rekan kerja"
 
@@ -288,6 +292,8 @@ def persona_for(agent):
     if agent.get("persona"):
         return agent["persona"]
     blob = " ".join(str(agent.get(k) or "") for k in ("role", "specialty", "task")).lower()
+    if "ms365" in blob or "microsoft" in blob or "office 365" in blob:
+        return PERSONAS["ms365"]
     if "lead" in blob:
         return PERSONAS["lead"]
     if "review" in blob or "qa" in blob:
