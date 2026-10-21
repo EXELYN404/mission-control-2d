@@ -181,7 +181,7 @@ def agent_reply(agent, message, *, state=None, task=None, allow_fallback=True):
         "model": None,
         "latency": None,
         "emotion": None,
-        "error": f"Model AI sedang tidak tersedia ({last_err})",
+        "error": "Model AI sedang sibuk. Coba lagi dalam beberapa menit.",
     }
 
 
@@ -268,8 +268,17 @@ def strip_mention(message, agent):
 # ------------------------------------------------------------------
 # 2. JEMBATAN CLI EXELYN AGENT AI (hermes -z)
 # ------------------------------------------------------------------
+# Cache ketersediaan Hermes supaya tidak menjalankan subprocess setiap panggilan.
+_hermes_cache = {"ok": None, "info": None, "ts": 0}
+_HERMES_CACHE_TTL = 300  # detik
+
 def hermes_available():
     """Apakah executable hermes ada dan bisa dijalankan?"""
+    global _hermes_cache
+    now = time.time()
+    if _hermes_cache["ok"] is not None and (now - _hermes_cache["ts"]) < _HERMES_CACHE_TTL:
+        return _hermes_cache["ok"], _hermes_cache["info"]
+
     path = None
     for cand in (HERMES_BIN, os.path.expanduser("~/.local/bin/hermes")):
         if os.path.sep in cand:
@@ -282,13 +291,17 @@ def hermes_available():
                 path = cand
                 break
     if not path:
-        return False, f"'{HERMES_BIN}' tidak ditemukan."
+        _hermes_cache = {"ok": False, "info": f"'{HERMES_BIN}' tidak ditemukan.", "ts": now}
+        return False, _hermes_cache["info"]
     try:
         out = subprocess.run([path, "--version"], capture_output=True,
-                             text=True, timeout=30)
+                             text=True, timeout=60)
     except Exception as exc:
-        return False, f"Tidak dapat menjalankan hermes: {exc}"
-    return True, (out.stdout or "").strip().splitlines()[0] if out.stdout else "hermes"
+        _hermes_cache = {"ok": False, "info": f"Tidak dapat menjalankan hermes: {exc}", "ts": now}
+        return False, _hermes_cache["info"]
+    result = (True, (out.stdout or "").strip().splitlines()[0] if out.stdout else "hermes")
+    _hermes_cache = {"ok": result[0], "info": result[1], "ts": now}
+    return result
 
 
 def hermes_oneshot(prompt, *, workdir=None, model=None, provider=None,

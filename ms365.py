@@ -32,7 +32,7 @@ from pathlib import Path
 # ------------------------------------------------------------------
 # KONFIGURASI
 # ------------------------------------------------------------------
-# Folder kerja lokal untuk dokumen yang sedang dibuat.
+RCLONE_BIN = os.environ.get("RCLONE_BIN") or shutil.which("rclone") or "rclone"
 WORK_DIR = Path(os.environ.get("MS365_WORK_DIR")
                 or (Path(__file__).resolve().parent / "data" / "ms365"))
 
@@ -519,11 +519,11 @@ def build_document(spec, *, keep=False):
 # ------------------------------------------------------------------
 def rclone_available():
     """Apakah rclone terpasang dan remote OneDrive terdaftar?"""
-    if shutil.which("rclone") is None:
+    if shutil.which("rclone") is None and not os.path.exists(RCLONE_BIN):
         return False, "rclone tidak ditemukan di sistem."
     try:
-        out = subprocess.run(["rclone", "listremotes"], capture_output=True,
-                             text=True, timeout=20)
+        out = subprocess.run([RCLONE_BIN, "listremotes"], capture_output=True,
+                             text=True, timeout=10)
     except Exception as exc:                                      # pragma: no cover
         return False, f"Tidak dapat menjalankan rclone: {exc}"
     remotes = [r.strip().rstrip(":") for r in (out.stdout or "").split() if r.strip()]
@@ -559,7 +559,7 @@ def upload_to_onedrive(path, *, folder=None):
 
     try:
         proc = subprocess.run(
-            ["rclone", "copyto", str(src), remote, "--stats", "0"],
+            [RCLONE_BIN, "copyto", str(src), remote, "--stats", "0"],
             capture_output=True, text=True, timeout=180,
         )
     except subprocess.TimeoutExpired:
@@ -573,7 +573,7 @@ def upload_to_onedrive(path, *, folder=None):
 
     # Verifikasi: ukuran berkas di remote harus sama dengan lokal.
     try:
-        chk = subprocess.run(["rclone", "size", remote],
+        chk = subprocess.run([RCLONE_BIN, "size", remote],
                              capture_output=True, text=True, timeout=60)
     except Exception:                                             # pragma: no cover
         chk = None
@@ -590,7 +590,7 @@ def upload_to_onedrive(path, *, folder=None):
     if not verified:
         # Verifikasi cadangan: cek berkas benar-benar terdaftar di remote.
         try:
-            ls = subprocess.run(["rclone", "lsf", remote],
+            ls = subprocess.run([RCLONE_BIN, "lsf", remote],
                                 capture_output=True, text=True, timeout=60)
             verified = ls.returncode == 0 and src.name in (ls.stdout or "")
         except Exception:                                         # pragma: no cover
@@ -617,13 +617,21 @@ def list_onedrive(folder=None):
     if not ok:
         raise Ms365Error(err, code="RCLONE_UNAVAILABLE")
     target = f"{RCLONE_REMOTE}{(folder or ONEDRIVE_FOLDER).strip('/')}"
-    proc = subprocess.run(["rclone", "lsf", target, "--max-depth", "1"],
-                          capture_output=True, text=True, timeout=60)
+    try:
+        proc = subprocess.run([RCLONE_BIN, "ls", target],
+                              capture_output=True, text=True, timeout=15)
+    except subprocess.TimeoutExpired:
+        return {"ok": True, "folder": (folder or ONEDRIVE_FOLDER), "files": []}
     if proc.returncode != 0:
         raise Ms365Error(f"Tidak dapat membaca folder OneDrive: "
                          f"{(proc.stderr or '').strip()[:200]}",
                          code="LIST_FAILED")
-    files = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    # rclone ls output: "size filename" per baris
+    files = []
+    for ln in (proc.stdout or "").splitlines():
+        parts = ln.strip().split(None, 1)
+        if len(parts) == 2:
+            files.append(parts[1].strip())
     return {"ok": True, "folder": (folder or ONEDRIVE_FOLDER), "files": files}
 
 
@@ -660,8 +668,17 @@ def deliver(spec, *, upload=True):
     return result
 
 
+# Cache status MS365 supaya tidak memanggil rclone setiap request.
+_ms365_cache = {"data": None, "ts": 0}
+_MS365_CACHE_TTL = 120  # detik
+
 def status():
     """Status kapabilitas modul (dipakai endpoint /api/ms365/status)."""
+    global _ms365_cache
+    now = time.time()
+    if _ms365_cache["data"] is not None and (now - _ms365_cache["ts"]) < _MS365_CACHE_TTL:
+        return _ms365_cache["data"]
+
     ok, err = rclone_available()
     deps = {}
     for name in ("docx", "openpyxl", "pptx", "reportlab"):
@@ -676,7 +693,7 @@ def status():
             folder_exists = list_onedrive()["files"] is not None
         except Ms365Error:
             folder_exists = False
-    return {
+    result = {
         "ok": ok,
         "rclone": "TERSEDIA" if ok else f"TIDAK: {err}",
         "remote": RCLONE_REMOTE,
@@ -686,6 +703,8 @@ def status():
         "deps": deps,
         "work_dir": str(WORK_DIR),
     }
+    _ms365_cache = {"data": result, "ts": now}
+    return result
 
 
 # ------------------------------------------------------------------

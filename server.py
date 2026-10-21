@@ -117,6 +117,9 @@ def init_db():
             priority TEXT DEFAULT 'medium',
             assignee_id TEXT,
             tags TEXT,
+            source TEXT DEFAULT 'manual',
+            source_ref TEXT,
+            specialty TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (assignee_id) REFERENCES agents(id) ON DELETE SET NULL
@@ -206,6 +209,12 @@ def init_db():
     _agent_cols = {r["name"] for r in cur.execute("PRAGMA table_info(agents)")}
     if "specialty" not in _agent_cols:
         cur.execute("ALTER TABLE agents ADD COLUMN specialty TEXT")
+
+    # Migrasi: tambah kolom source/source_ref/specialty ke tabel tasks bila belum ada.
+    _task_cols = {r["name"] for r in cur.execute("PRAGMA table_info(tasks)")}
+    for _col, _typ in (("source", "TEXT"), ("source_ref", "TEXT"), ("specialty", "TEXT")):
+        if _col not in _task_cols:
+            cur.execute(f"ALTER TABLE tasks ADD COLUMN {_col} {_typ}")
 
     # Migrasi peran: Vera menjadi Microsoft 365 Specialist. Tim tetap enam
     # orang — tidak ada karakter ketujuh — tetapi satu peran berubah jadi

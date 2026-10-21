@@ -55,9 +55,10 @@ LLM7_MODELS = ["gpt-oss:20b", "minimax-m2.7", "mistral-Nemo-Instruct-2407"]
 # OVH AI Endpoints — juga tanpa kunci, dan biasanya lebih longgar kuotanya.
 OVH_URL = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions"
 OVH_MODELS = [
-    "Meta-Llama-3_3-70B-Instruct",        # paling baik untuk bahasa Indonesia
+    "gpt-oss-120b",                   # stabil, kuota longgar
+    "gpt-oss-20b",
+    "Mistral-Small-3.2-24B-Instruct-2506",
     "Qwen3.8-27B",
-    "Mistral-Nemo-Instruct-2407",
 ]
 
 REQUEST_TIMEOUT = 25          # detik per percobaan
@@ -85,7 +86,7 @@ def _is_down(prov):
     return _down_until.get(prov, 0) > time.time()
 
 
-def _mark_down(prov, seconds=900):
+def _mark_down(prov, seconds=300):
     _down_until[prov] = time.time() + seconds
 
 

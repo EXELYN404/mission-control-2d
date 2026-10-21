@@ -1609,9 +1609,9 @@ body {
 
 /* --- panel --- */
 .chat-panel {
-  width: 384px;
+  width: 340px;
   max-width: calc(100vw - 36px);
-  height: 480px;
+  height: 420px;
   max-height: calc(100vh - 130px);
   display: flex;
   flex-direction: column;

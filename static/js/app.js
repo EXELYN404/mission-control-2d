@@ -420,9 +420,7 @@ function openChat() {
   if (!panel) return;
   panel.hidden = false;
   panel.classList.remove("closing");
-  panel.classList.add("opening");
-  panel.addEventListener("animationend", () => panel.classList.remove("opening"), { once: true });
-  launcher.setAttribute("aria-expanded", "true");
+  if (launcher) launcher.setAttribute("aria-expanded", "true");
   chatState.open = true;
   loadChat();
   const input = $("#chat-input");
@@ -433,20 +431,9 @@ function closeChat() {
   const panel = $("#chat-panel");
   const launcher = $("#chat-launcher");
   if (!panel) return;
-  panel.classList.remove("opening");
-  panel.classList.add("closing");
-  const done = () => {
-    panel.hidden = true;
-    panel.classList.remove("closing");
-  };
-  panel.addEventListener("animationend", done, { once: true });
-  // Jaring pengaman bila event animasi tidak terpanggil.
-  setTimeout(() => {
-    if (!panel.classList.contains("closing")) return;
-    panel.hidden = true;
-    panel.classList.remove("closing");
-  }, 200);
-  launcher.setAttribute("aria-expanded", "false");
+  panel.classList.remove("opening", "closing");
+  panel.hidden = true;
+  if (launcher) launcher.setAttribute("aria-expanded", "false");
   chatState.open = false;
 }
 
